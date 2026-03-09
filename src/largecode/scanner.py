@@ -47,6 +47,18 @@ SKIP_DIRS: frozenset[str] = frozenset({
     ".git", ".venv", "node_modules", "target", "dist", "build",
 })
 
+# Filename suffixes that look like source but contain no real code —
+# declaration files, minified bundles, and common generated-file patterns.
+SKIP_SUFFIXES: frozenset[str] = frozenset({
+    ".d.ts",        # TypeScript declaration files
+    ".min.js",      # Minified JavaScript
+    ".min.ts",      # Minified TypeScript
+    ".min.mjs",     # Minified ES module
+    "_pb2.py",      # Python protobuf generated
+    "_pb.go",       # Go protobuf generated
+    ".pb.go",       # Go protobuf generated (alt convention)
+})
+
 
 @dataclass
 class Finding:
@@ -65,6 +77,9 @@ def iter_code_files(root: str) -> Iterable[tuple[str, str]]:
             if d not in SKIP_DIRS and not d.startswith(".")
         ]
         for filename in filenames:
+            lower = filename.lower()
+            if any(lower.endswith(s) for s in SKIP_SUFFIXES):
+                continue
             _, ext = os.path.splitext(filename)
             lang = EXT_TO_LANG.get(ext.lower())
             if lang:
