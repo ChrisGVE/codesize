@@ -1,26 +1,13 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-*.egg-info/
-*.egg
-dist/
-build/
-.eggs/
-
-# uv / virtual envs
-.venv/
-.uv/
-
-# Tools
-.ruff_cache/
-.mypy_cache/
-.pytest_cache/
+# Rust build output
+target/
 
 # Project output
-largecode.csv
+codesize.csv
 tmp/
+
+# Local session files
+handover.md
+.taskmaster/
 
 # macOS
 .DS_Store
