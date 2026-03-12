@@ -18,6 +18,10 @@ struct Args {
     /// Percent tolerance added to limits (default 0).
     #[arg(long, default_value_t = 0.0)]
     tolerance: f64,
+
+    /// Respect .gitignore and .ignore files found in the scanned tree.
+    #[arg(long, default_value_t = false)]
+    gitignore: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -30,7 +34,7 @@ fn main() -> anyhow::Result<()> {
 
     let root = args.root.canonicalize()?;
     let cfg = config::load_config();
-    let mut findings = scanner::build_report(&root, args.tolerance, &cfg);
+    let mut findings = scanner::build_report(&root, args.tolerance, &cfg, args.gitignore);
     scanner::write_csv(&mut findings, &args.output)?;
     Ok(())
 }
