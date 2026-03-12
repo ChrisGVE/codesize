@@ -11,15 +11,21 @@ struct Args {
     #[arg(long, default_value = ".")]
     root: PathBuf,
 
-    /// CSV output path (defaults to largecode.csv in current directory).
-    #[arg(long, default_value = "largecode.csv")]
-    output: PathBuf,
+    /// CSV output path.  Defaults to the value of `default_output_file` in
+    /// config (built-in default: largecode.csv).  Ignored when --stdout is set.
+    #[arg(long)]
+    output: Option<PathBuf>,
+
+    /// Write the CSV report to stdout instead of a file.
+    #[arg(long, default_value_t = false)]
+    stdout: bool,
 
     /// Percent tolerance added to limits (default 0).
     #[arg(long, default_value_t = 0.0)]
     tolerance: f64,
 
-    /// Respect .gitignore and .ignore files found in the scanned tree.
+    /// Respect .gitignore / .ignore files found in the scanned tree.
+    /// Overrides the `respect_gitignore` setting in config.toml.
     #[arg(long, default_value_t = false)]
     gitignore: bool,
 }
@@ -33,8 +39,22 @@ fn main() -> anyhow::Result<()> {
     }
 
     let root = args.root.canonicalize()?;
-    let cfg = config::load_config();
-    let mut findings = scanner::build_report(&root, args.tolerance, &cfg, args.gitignore);
-    scanner::write_csv(&mut findings, &args.output)?;
+    let mut cfg = config::load_config();
+
+    // CLI --gitignore overrides config; it can only enable, not disable.
+    cfg.respect_gitignore |= args.gitignore;
+
+    let mut findings = scanner::build_report(&root, args.tolerance, &cfg);
+
+    let output: Option<PathBuf> = if args.stdout {
+        None
+    } else {
+        Some(
+            args.output
+                .unwrap_or_else(|| PathBuf::from(&cfg.default_output_file)),
+        )
+    };
+
+    scanner::write_csv(&mut findings, output.as_deref())?;
     Ok(())
 }

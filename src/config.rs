@@ -10,7 +10,20 @@ pub struct LangLimits {
 
 #[derive(Debug, Clone, Deserialize, Default)]
 struct ScanOverrides {
+    /// Respect .gitignore / .ignore / global git excludes (default: false).
+    respect_gitignore: Option<bool>,
+    /// Additional gitignore-style filenames to look for in every directory
+    /// (e.g. [".npmignore", ".dockerignore"]).  Applied regardless of
+    /// `respect_gitignore`.
+    respect_ignore_files: Option<Vec<String>>,
+    /// Paths to explicit gitignore-pattern files to apply during the walk
+    /// (e.g. ["~/.globalignore"]).  Applied regardless of `respect_gitignore`.
+    ignore_files: Option<Vec<String>>,
+    /// Default CSV output path used when --output is not passed on the CLI.
+    default_output_file: Option<String>,
+    /// Replaces the built-in skip-directory list when present.
     skip_dirs: Option<Vec<String>>,
+    /// Replaces the built-in skip-suffix list when present.
     skip_suffixes: Option<Vec<String>>,
 }
 
@@ -26,6 +39,10 @@ pub struct Config {
     pub limits: HashMap<String, LangLimits>,
     pub skip_dirs: HashSet<String>,
     pub skip_suffixes: HashSet<String>,
+    pub respect_gitignore: bool,
+    pub respect_ignore_files: Vec<String>,
+    pub ignore_files: Vec<String>,
+    pub default_output_file: String,
 }
 
 fn default_limits() -> HashMap<String, LangLimits> {
@@ -72,9 +89,10 @@ fn config_path() -> Option<PathBuf> {
 
 /// Loads configuration from the XDG config file, merging with built-in defaults.
 ///
-/// Language limits from the config file override individual entries in the
-/// default table. If `scan.skip_dirs` or `scan.skip_suffixes` are present they
-/// replace (not extend) the corresponding defaults.
+/// - Individual language limits are overridden per-entry; others keep defaults.
+/// - `skip_dirs` / `skip_suffixes` replace the defaults when present.
+/// - `respect_ignore_files` / `ignore_files` extend the walk with additional
+///   gitignore-style rules and are empty by default.
 pub fn load_config() -> Config {
     let file_cfg: FileConfig = config_path()
         .and_then(|p| std::fs::read_to_string(p).ok())
@@ -102,6 +120,13 @@ pub fn load_config() -> Config {
         limits,
         skip_dirs,
         skip_suffixes,
+        respect_gitignore: file_cfg.scan.respect_gitignore.unwrap_or(false),
+        respect_ignore_files: file_cfg.scan.respect_ignore_files.unwrap_or_default(),
+        ignore_files: file_cfg.scan.ignore_files.unwrap_or_default(),
+        default_output_file: file_cfg
+            .scan
+            .default_output_file
+            .unwrap_or_else(|| "largecode.csv".to_string()),
     }
 }
 
@@ -143,6 +168,20 @@ mod tests {
     }
 
     #[test]
+    fn default_config_gitignore_off() {
+        let cfg = load_config();
+        assert!(!cfg.respect_gitignore);
+        assert!(cfg.respect_ignore_files.is_empty());
+        assert!(cfg.ignore_files.is_empty());
+    }
+
+    #[test]
+    fn default_output_file_is_csv() {
+        let cfg = load_config();
+        assert_eq!(cfg.default_output_file, "largecode.csv");
+    }
+
+    #[test]
     fn toml_override_replaces_single_limit() {
         let toml = r#"
 [limits.Rust]
@@ -157,7 +196,6 @@ function = 99
         let rust = &limits["Rust"];
         assert_eq!(rust.file, 999);
         assert_eq!(rust.function, 99);
-        // Other languages unchanged
         assert_eq!(limits["Python"].file, 300);
     }
 }

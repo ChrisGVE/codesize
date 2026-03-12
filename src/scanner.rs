@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use ignore::WalkBuilder;
-use walkdir::WalkDir;
 
 use crate::config::Config;
 use crate::parser::analyze_file;
@@ -32,15 +31,16 @@ fn ext_to_lang(ext: &str) -> Option<&'static str> {
     }
 }
 
-/// Returns `true` if the path (relative to root) passes through no skip or hidden dir.
+/// Returns `true` if no directory component of `rel` is in `config.skip_dirs`.
+/// Hidden-directory pruning is handled by WalkBuilder's `.hidden(true)` option.
 fn in_allowed_dir(rel: &Path, config: &Config) -> bool {
     rel.components().all(|c| {
         let name = c.as_os_str().to_string_lossy();
-        !config.skip_dirs.contains(name.as_ref()) && !name.starts_with('.')
+        !config.skip_dirs.contains(name.as_ref())
     })
 }
 
-/// Applies per-entry filename and extension filters, yielding `(path, lang)`.
+/// Applies per-entry filename/extension filters, yielding `(path, lang)`.
 fn classify(path: PathBuf, config: &Config) -> Option<(PathBuf, &'static str)> {
     let filename = path.file_name()?.to_string_lossy().to_lowercase();
     if config
@@ -55,63 +55,52 @@ fn classify(path: PathBuf, config: &Config) -> Option<(PathBuf, &'static str)> {
     Some((path, lang))
 }
 
-/// Iterates over source files under `root`.
+/// Iterates over source files under `root`, applying all configured filters.
 ///
-/// When `gitignore` is `true` the walk respects all `.gitignore` and
-/// `.ignore` files found along the way (via the `ignore` crate).
-/// The configured `skip_dirs` / `skip_suffixes` are applied in both modes.
+/// Ignore rules are additive:
+/// - `config.respect_gitignore` enables standard `.gitignore` / `.ignore` /
+///   global git-exclude handling.
+/// - `config.respect_ignore_files` adds extra filenames (e.g. `.npmignore`)
+///   that are treated as gitignore-style ignore files in every directory.
+/// - `config.ignore_files` provides explicit ignore-pattern files to load.
+/// - `config.skip_dirs` prunes named directories regardless of ignore rules.
+/// - `config.skip_suffixes` filters by filename suffix.
 pub fn iter_code_files<'a>(
     root: &'a Path,
     config: &'a Config,
-    gitignore: bool,
-) -> Box<dyn Iterator<Item = (PathBuf, &'static str)> + 'a> {
-    if gitignore {
-        let walker = WalkBuilder::new(root)
-            .hidden(true)
-            .git_ignore(true)
-            .git_global(true)
-            .git_exclude(true)
-            .require_git(false)
-            .build();
+) -> impl Iterator<Item = (PathBuf, &'static str)> + 'a {
+    let mut builder = WalkBuilder::new(root);
+    builder
+        .hidden(true)
+        .git_ignore(config.respect_gitignore)
+        .git_global(config.respect_gitignore)
+        .git_exclude(config.respect_gitignore)
+        .require_git(false);
 
-        Box::new(
-            walker
-                .filter_map(|e| e.ok())
-                .filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false))
-                .filter(move |e| {
-                    e.path()
-                        .strip_prefix(root)
-                        .map(|rel| in_allowed_dir(rel, config))
-                        .unwrap_or(false)
-                })
-                .filter_map(move |e| classify(e.path().to_path_buf(), config)),
-        )
-    } else {
-        Box::new(
-            WalkDir::new(root)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| e.file_type().is_file())
-                .filter(move |e| {
-                    e.path()
-                        .strip_prefix(root)
-                        .map(|rel| in_allowed_dir(rel, config))
-                        .unwrap_or(false)
-                })
-                .filter_map(move |e| classify(e.path().to_path_buf(), config)),
-        )
+    for name in &config.respect_ignore_files {
+        builder.add_custom_ignore_filename(name);
     }
+    for file in &config.ignore_files {
+        builder.add_ignore(file);
+    }
+
+    builder
+        .build()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false))
+        .filter(move |e| {
+            e.path()
+                .strip_prefix(root)
+                .map(|rel| in_allowed_dir(rel, config))
+                .unwrap_or(false)
+        })
+        .filter_map(move |e| classify(e.path().to_path_buf(), config))
 }
 
 /// Scans `root` and returns all findings that exceed the configured limits.
-pub fn build_report(
-    root: &Path,
-    tolerance_pct: f64,
-    config: &Config,
-    gitignore: bool,
-) -> Vec<Finding> {
+pub fn build_report(root: &Path, tolerance_pct: f64, config: &Config) -> Vec<Finding> {
     let mut findings = Vec::new();
-    for (path, lang) in iter_code_files(root, config, gitignore) {
+    for (path, lang) in iter_code_files(root, config) {
         let rel = path
             .strip_prefix(root)
             .unwrap_or(&path)
@@ -155,30 +144,42 @@ pub fn build_report(
     findings
 }
 
-/// Writes `findings` as CSV to `output_path`, sorted by (language, lines desc).
-pub fn write_csv(findings: &mut Vec<Finding>, output_path: &Path) -> anyhow::Result<()> {
+/// Writes `findings` as CSV sorted by (language, lines desc).
+///
+/// Pass `output = Some(path)` to write to a file, or `None` to write to stdout.
+pub fn write_csv(findings: &mut Vec<Finding>, output: Option<&Path>) -> anyhow::Result<()> {
     findings.sort_by(|a, b| a.language.cmp(&b.language).then(b.lines.cmp(&a.lines)));
-    let mut writer = csv::Writer::from_path(output_path)?;
-    writer.write_record([
-        "language",
-        "exception",
-        "function",
-        "codefile",
-        "lines",
-        "limit",
-    ])?;
-    for f in findings.iter() {
-        writer.write_record([
-            &f.language,
-            &f.exception,
-            &f.function,
-            &f.codefile,
-            &f.lines.to_string(),
-            &f.limit.to_string(),
+
+    fn write_records<W: std::io::Write>(
+        w: &mut csv::Writer<W>,
+        findings: &[Finding],
+    ) -> anyhow::Result<()> {
+        w.write_record([
+            "language",
+            "exception",
+            "function",
+            "codefile",
+            "lines",
+            "limit",
         ])?;
+        for f in findings {
+            w.write_record([
+                &f.language,
+                &f.exception,
+                &f.function,
+                &f.codefile,
+                &f.lines.to_string(),
+                &f.limit.to_string(),
+            ])?;
+        }
+        w.flush()?;
+        Ok(())
     }
-    writer.flush()?;
-    Ok(())
+
+    match output {
+        Some(path) => write_records(&mut csv::Writer::from_path(path)?, findings),
+        None => write_records(&mut csv::Writer::from_writer(std::io::stdout()), findings),
+    }
 }
 
 #[cfg(test)]
@@ -198,7 +199,7 @@ mod tests {
 
     fn found_names(root: &Path) -> Vec<String> {
         let cfg = load_config();
-        iter_code_files(root, &cfg, false)
+        iter_code_files(root, &cfg)
             .map(|(p, _)| p.file_name().unwrap().to_string_lossy().into_owned())
             .collect()
     }
@@ -261,8 +262,9 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         make_tree(tmp.path(), &["src/main.py", "src/generated.py"]);
         fs::write(tmp.path().join(".gitignore"), b"generated.py\n").unwrap();
-        let cfg = load_config();
-        let names: Vec<String> = iter_code_files(tmp.path(), &cfg, true)
+        let mut cfg = load_config();
+        cfg.respect_gitignore = true;
+        let names: Vec<String> = iter_code_files(tmp.path(), &cfg)
             .map(|(p, _)| p.file_name().unwrap().to_string_lossy().into_owned())
             .collect();
         assert!(names.contains(&"main.py".to_string()));
@@ -274,11 +276,39 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         make_tree(tmp.path(), &["src/main.py", "src/generated.py"]);
         fs::write(tmp.path().join(".gitignore"), b"generated.py\n").unwrap();
-        let cfg = load_config();
-        let names: Vec<String> = iter_code_files(tmp.path(), &cfg, false)
+        let names: Vec<String> = iter_code_files(tmp.path(), &load_config())
             .map(|(p, _)| p.file_name().unwrap().to_string_lossy().into_owned())
             .collect();
         assert!(names.contains(&"main.py".to_string()));
         assert!(names.contains(&"generated.py".to_string()));
+    }
+
+    #[test]
+    fn respect_ignore_files_honoured() {
+        let tmp = TempDir::new().unwrap();
+        make_tree(tmp.path(), &["src/main.py", "src/vendor.py"]);
+        fs::write(tmp.path().join(".myignore"), b"vendor.py\n").unwrap();
+        let mut cfg = load_config();
+        cfg.respect_ignore_files = vec![".myignore".to_string()];
+        let names: Vec<String> = iter_code_files(tmp.path(), &cfg)
+            .map(|(p, _)| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert!(names.contains(&"main.py".to_string()));
+        assert!(!names.contains(&"vendor.py".to_string()));
+    }
+
+    #[test]
+    fn explicit_ignore_file_honoured() {
+        let tmp = TempDir::new().unwrap();
+        make_tree(tmp.path(), &["src/main.py", "src/generated.py"]);
+        let ignore_path = tmp.path().join("my.ignore");
+        fs::write(&ignore_path, b"generated.py\n").unwrap();
+        let mut cfg = load_config();
+        cfg.ignore_files = vec![ignore_path.to_string_lossy().into_owned()];
+        let names: Vec<String> = iter_code_files(tmp.path(), &cfg)
+            .map(|(p, _)| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert!(names.contains(&"main.py".to_string()));
+        assert!(!names.contains(&"generated.py".to_string()));
     }
 }

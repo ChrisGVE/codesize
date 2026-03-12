@@ -1,0 +1,94 @@
+# LargeCode – example configuration file
+#
+# Copy this file to:
+#   $XDG_CONFIG_HOME/largecode/config.toml   (preferred)
+#   ~/.config/largecode/config.toml          (fallback)
+#
+# All keys are optional.  Values shown here are the built-in defaults.
+# Missing keys fall back to those defaults.
+
+# ---------------------------------------------------------------------------
+# [scan] – file-discovery behaviour
+# ---------------------------------------------------------------------------
+[scan]
+
+# Respect .gitignore / .ignore files and global git excludes while walking
+# the source tree.  Can also be enabled per-run with --gitignore.
+respect_gitignore = false
+
+# Additional filenames, searched in every visited directory, that are treated
+# as gitignore-style ignore files.  Active regardless of respect_gitignore.
+# Example: ignore files named .npmignore or .dockerignore in each directory.
+respect_ignore_files = []
+# respect_ignore_files = [".npmignore", ".dockerignore"]
+
+# Explicit gitignore-pattern files to load unconditionally.
+# Paths may be absolute or relative to the working directory.
+# Active regardless of respect_gitignore.
+ignore_files = []
+# ignore_files = ["~/.config/largecode/global.ignore", ".project.ignore"]
+
+# Default output file when --output is not passed on the command line.
+default_output_file = "largecode.csv"
+
+# Directories to skip entirely (replaces the built-in list when present).
+# The built-in list is shown below.
+skip_dirs = [".git", ".venv", "node_modules", "target", "dist", "build"]
+
+# Filename suffixes to skip (replaces the built-in list when present).
+# Matched against the full lowercased filename, so ".d.ts" catches "foo.d.ts".
+skip_suffixes = [
+    ".d.ts",     # TypeScript declaration files
+    ".min.js",   # Minified JavaScript
+    ".min.ts",   # Minified TypeScript
+    ".min.mjs",  # Minified ES module
+    "_pb2.py",   # Python protobuf generated
+    "_pb.go",    # Go protobuf generated
+    ".pb.go",    # Go protobuf generated (alternate convention)
+]
+
+# ---------------------------------------------------------------------------
+# [limits.<Language>] – per-language file and function size limits
+# ---------------------------------------------------------------------------
+# Each entry overrides just that language; others keep their built-in values.
+# Built-in defaults are shown below for reference.
+
+[limits.Rust]
+file     = 500
+function = 80
+
+[limits.TypeScript]
+file     = 300
+function = 40
+
+[limits.JavaScript]
+file     = 300
+function = 40
+
+[limits.Python]
+file     = 300
+function = 30
+
+[limits.Go]
+file     = 400
+function = 60
+
+[limits.Java]
+file     = 300
+function = 30
+
+[limits.C]
+file     = 500
+function = 60
+
+[limits."C++"]
+file     = 400
+function = 60
+
+[limits.Swift]
+file     = 400
+function = 50
+
+[limits.Lua]
+file     = 400
+function = 50
