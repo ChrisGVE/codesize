@@ -1,0 +1,37 @@
+[package]
+name = "codesize"
+version = "0.1.0"
+edition = "2021"
+description = "Report code size violations by file and function"
+license = "MIT"
+
+[lib]
+name = "codesize"
+path = "src/lib.rs"
+
+[[bin]]
+name = "codesize"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+csv = "1"
+dirs = "5"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+tree-sitter = "0.26"
+tree-sitter-c = "0.24"
+tree-sitter-cpp = "0.23"
+tree-sitter-go = "0.25"
+tree-sitter-java = "0.23"
+tree-sitter-javascript = "0.25"
+tree-sitter-lua = "0.5"
+tree-sitter-python = "0.25"
+tree-sitter-rust = "0.24"
+tree-sitter-swift = "0.7"
+tree-sitter-typescript = "0.23"
+ignore = "0.4"
+
+[dev-dependencies]
+tempfile = "3"
