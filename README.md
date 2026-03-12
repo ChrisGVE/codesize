@@ -12,13 +12,47 @@ C · C++ · Swift · Lua**
 
 ## Installation
 
+### Homebrew (macOS and Linux)
+
+```bash
+brew install ChrisGVE/tap/codesize
+```
+
 ### From source (requires Rust 1.75+)
+
+```bash
+cargo install --git https://github.com/ChrisGVE/codesize
+```
+
+Or, from a local clone:
 
 ```bash
 cargo install --path .
 ```
 
-The binary is installed as `codesize`.
+---
+
+## Shell completion
+
+Generate and install a completion script for your shell:
+
+```bash
+# zsh – add to ~/.zshrc or drop into your completions directory
+codesize init zsh >> ~/.zshrc
+
+# bash
+codesize init bash >> ~/.bashrc
+
+# fish
+codesize init fish > ~/.config/fish/completions/codesize.fish
+
+# elvish / powershell also supported
+codesize init elvish
+codesize init powershell
+```
+
+When installed via Homebrew, completions for bash, zsh, and fish are set up
+automatically.
 
 ---
 
@@ -91,12 +125,12 @@ codesize looks for a TOML config file at:
 1. `$XDG_CONFIG_HOME/codesize/config.toml` (preferred)
 2. `~/.config/codesize/config.toml` (fallback)
 
-A fully documented starting-point is provided in
-[`config.example.toml`](config.example.toml).  Copy it to the right location:
+[`config.toml`](config.toml) in this repository is a fully documented template
+listing every option with its built-in default.  Copy it to get started:
 
 ```bash
 mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/codesize"
-cp config.example.toml "${XDG_CONFIG_HOME:-$HOME/.config}/codesize/config.toml"
+cp config.toml "${XDG_CONFIG_HOME:-$HOME/.config}/codesize/config.toml"
 ```
 
 ### `[scan]` options
@@ -146,20 +180,6 @@ function = 50    # was 30; leave file limit at 300
 | C++ | 400 | 60 |
 | Swift | 400 | 50 |
 | Lua | 400 | 50 |
-
-### Example config
-
-```toml
-[scan]
-respect_gitignore     = true
-respect_ignore_files  = [".npmignore", ".dockerignore"]
-ignore_files          = ["~/.config/codesize/global.ignore"]
-default_output_file   = "reports/size-report.csv"
-
-[limits.Rust]
-file     = 600
-function = 100
-```
 
 ---
 

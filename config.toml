@@ -1,8 +1,10 @@
-# codesize – example configuration file
+# codesize – configuration template
 #
-# Copy this file to:
-#   $XDG_CONFIG_HOME/codesize/config.toml   (preferred)
-#   ~/.config/codesize/config.toml          (fallback)
+# This file documents all available options with their built-in defaults.
+# Use it as a starting point for your own config:
+#
+#   mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/codesize"
+#   cp config.toml "${XDG_CONFIG_HOME:-$HOME/.config}/codesize/config.toml"
 #
 # All keys are optional.  Values shown here are the built-in defaults.
 # Missing keys fall back to those defaults.
