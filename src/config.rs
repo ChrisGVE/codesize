@@ -84,7 +84,7 @@ fn config_path() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .or_else(|| dirs::home_dir().map(|h| h.join(".config")))?;
-    Some(base.join("largecode").join("config.toml"))
+    Some(base.join("codesize").join("config.toml"))
 }
 
 /// Loads configuration from the XDG config file, merging with built-in defaults.
@@ -126,7 +126,7 @@ pub fn load_config() -> Config {
         default_output_file: file_cfg
             .scan
             .default_output_file
-            .unwrap_or_else(|| "largecode.csv".to_string()),
+            .unwrap_or_else(|| "codesize.csv".to_string()),
     }
 }
 
@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn default_output_file_is_csv() {
         let cfg = load_config();
-        assert_eq!(cfg.default_output_file, "largecode.csv");
+        assert_eq!(cfg.default_output_file, "codesize.csv");
     }
 
     #[test]

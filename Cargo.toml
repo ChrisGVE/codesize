@@ -1,16 +1,16 @@
 [package]
-name = "largecode"
+name = "codesize"
 version = "0.1.0"
 edition = "2021"
 description = "Report code size violations by file and function"
 license = "MIT"
 
 [lib]
-name = "largecode"
+name = "codesize"
 path = "src/lib.rs"
 
 [[bin]]
-name = "LargeCode"
+name = "codesize"
 path = "src/main.rs"
 
 [dependencies]

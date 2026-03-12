@@ -1,4 +1,4 @@
-# LargeCode
+# codesize
 
 A fast, single-binary CLI tool that scans a source tree and reports files and
 functions that exceed per-language size limits.  Results are written to a CSV
@@ -18,27 +18,27 @@ C · C++ · Swift · Lua**
 cargo install --path .
 ```
 
-The binary is installed as `LargeCode`.
+The binary is installed as `codesize`.
 
 ---
 
 ## Quick start
 
 ```bash
-# Scan the current directory, write largecode.csv
-LargeCode
+# Scan the current directory, write codesize.csv
+codesize
 
 # Scan a specific project
-LargeCode --root ~/projects/myapp
+codesize --root ~/projects/myapp
 
 # Print results to stdout instead of a file
-LargeCode --stdout
+codesize --stdout
 
 # Respect .gitignore files in the scanned tree
-LargeCode --gitignore
+codesize --gitignore
 
 # Allow 10 % headroom above every language limit
-LargeCode --tolerance 10
+codesize --tolerance 10
 ```
 
 ---
@@ -48,7 +48,7 @@ LargeCode --tolerance 10
 | Flag | Default | Description |
 |---|---|---|
 | `--root <path>` | `.` (cwd) | Directory to scan |
-| `--output <path>` | `largecode.csv`* | CSV output file path |
+| `--output <path>` | `codesize.csv`* | CSV output file path |
 | `--stdout` | off | Write CSV to stdout; ignores `--output` |
 | `--tolerance <n>` | `0` | Percent tolerance added to every limit |
 | `--gitignore` | off | Honour `.gitignore` / `.ignore` files; overrides config |
@@ -86,17 +86,17 @@ Rows are sorted by language, then by line count descending.
 
 ## Configuration
 
-LargeCode looks for a TOML config file at:
+codesize looks for a TOML config file at:
 
-1. `$XDG_CONFIG_HOME/largecode/config.toml` (preferred)
-2. `~/.config/largecode/config.toml` (fallback)
+1. `$XDG_CONFIG_HOME/codesize/config.toml` (preferred)
+2. `~/.config/codesize/config.toml` (fallback)
 
 A fully documented starting-point is provided in
 [`config.example.toml`](config.example.toml).  Copy it to the right location:
 
 ```bash
-mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/largecode"
-cp config.example.toml "${XDG_CONFIG_HOME:-$HOME/.config}/largecode/config.toml"
+mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/codesize"
+cp config.example.toml "${XDG_CONFIG_HOME:-$HOME/.config}/codesize/config.toml"
 ```
 
 ### `[scan]` options
@@ -106,7 +106,7 @@ cp config.example.toml "${XDG_CONFIG_HOME:-$HOME/.config}/largecode/config.toml"
 | `respect_gitignore` | bool | `false` | Honour `.gitignore`, `.ignore`, global git excludes |
 | `respect_ignore_files` | list | `[]` | Extra filenames (e.g. `.npmignore`) treated as ignore files in each directory |
 | `ignore_files` | list | `[]` | Explicit ignore-pattern files to load unconditionally |
-| `default_output_file` | string | `"largecode.csv"` | Output file when `--output` is not passed |
+| `default_output_file` | string | `"codesize.csv"` | Output file when `--output` is not passed |
 | `skip_dirs` | list | see below | Directory names to skip entirely (replaces built-in list) |
 | `skip_suffixes` | list | see below | Filename suffixes to exclude (replaces built-in list) |
 
@@ -153,7 +153,7 @@ function = 50    # was 30; leave file limit at 300
 [scan]
 respect_gitignore     = true
 respect_ignore_files  = [".npmignore", ".dockerignore"]
-ignore_files          = ["~/.config/largecode/global.ignore"]
+ignore_files          = ["~/.config/codesize/global.ignore"]
 default_output_file   = "reports/size-report.csv"
 
 [limits.Rust]
@@ -165,7 +165,7 @@ function = 100
 
 ## How it works
 
-LargeCode uses [tree-sitter](https://tree-sitter.github.io/tree-sitter/) to
+codesize uses [tree-sitter](https://tree-sitter.github.io/tree-sitter/) to
 build an AST for each source file and walks it to find function boundaries.
 This means it correctly counts only the lines belonging to each function,
 including nested functions, without being tripped up by comments or strings.

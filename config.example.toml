@@ -1,8 +1,8 @@
-# LargeCode – example configuration file
+# codesize – example configuration file
 #
 # Copy this file to:
-#   $XDG_CONFIG_HOME/largecode/config.toml   (preferred)
-#   ~/.config/largecode/config.toml          (fallback)
+#   $XDG_CONFIG_HOME/codesize/config.toml   (preferred)
+#   ~/.config/codesize/config.toml          (fallback)
 #
 # All keys are optional.  Values shown here are the built-in defaults.
 # Missing keys fall back to those defaults.
@@ -26,10 +26,10 @@ respect_ignore_files = []
 # Paths may be absolute or relative to the working directory.
 # Active regardless of respect_gitignore.
 ignore_files = []
-# ignore_files = ["~/.config/largecode/global.ignore", ".project.ignore"]
+# ignore_files = ["~/.config/codesize/global.ignore", ".project.ignore"]
 
 # Default output file when --output is not passed on the command line.
-default_output_file = "largecode.csv"
+default_output_file = "codesize.csv"
 
 # Directories to skip entirely (replaces the built-in list when present).
 # The built-in list is shown below.

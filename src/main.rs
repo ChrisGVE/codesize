@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::process;
 
 use clap::Parser;
-use largecode::{config, scanner};
+use codesize::{config, scanner};
 
 #[derive(Parser)]
 #[command(about = "Report code size violations by file and function.")]
@@ -12,7 +12,7 @@ struct Args {
     root: PathBuf,
 
     /// CSV output path.  Defaults to the value of `default_output_file` in
-    /// config (built-in default: largecode.csv).  Ignored when --stdout is set.
+    /// config (built-in default: codesize.csv).  Ignored when --stdout is set.
     #[arg(long)]
     output: Option<PathBuf>,
 
