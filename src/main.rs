@@ -1,12 +1,17 @@
+use std::io;
 use std::path::PathBuf;
 use std::process;
 
-use clap::Parser;
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::{generate, Shell};
 use codesize::{config, scanner};
 
 #[derive(Parser)]
-#[command(about = "Report code size violations by file and function.")]
+#[command(about = "Report code size violations by file and function.", version)]
 struct Args {
+    #[command(subcommand)]
+    command: Option<Command>,
+
     /// Root directory to scan (defaults to current directory).
     #[arg(long, default_value = ".")]
     root: PathBuf,
@@ -30,8 +35,29 @@ struct Args {
     gitignore: bool,
 }
 
+#[derive(Subcommand)]
+enum Command {
+    /// Print a shell completion script to stdout.
+    ///
+    /// Usage examples:
+    ///   codesize init zsh  >> ~/.zshrc
+    ///   codesize init bash >> ~/.bashrc
+    ///   codesize init fish > ~/.config/fish/completions/codesize.fish
+    Init {
+        /// Shell to generate completions for.
+        #[arg(value_enum)]
+        shell: Shell,
+    },
+}
+
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
+
+    if let Some(Command::Init { shell }) = args.command {
+        let mut cmd = Args::command();
+        generate(shell, &mut cmd, "codesize", &mut io::stdout());
+        return Ok(());
+    }
 
     if args.tolerance < 0.0 {
         eprintln!("error: --tolerance must be >= 0");

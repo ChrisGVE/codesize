@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: codesize-darwin-arm64
+          - target: x86_64-apple-darwin
+            os: macos-13
+            artifact: codesize-darwin-x64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: codesize-linux-x64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: codesize-linux-arm64
+            use_cross: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.use_cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build
+        run: |
+          if [ "${{ matrix.use_cross }}" = "true" ]; then
+            cross build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
+      - name: Package
+        run: |
+          BIN=target/${{ matrix.target }}/release/codesize
+          mkdir -p dist
+          cp "$BIN" dist/codesize
+          cp LICENSE dist/
+          cp README.md dist/
+          cd dist
+          tar czf ../${{ matrix.artifact }}.tar.gz .
+          cd ..
+          echo "sha256=$(shasum -a 256 ${{ matrix.artifact }}.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+        id: package
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.tar.gz
+
+  release:
+    name: Create release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.tar.gz
+          generate_release_notes: true
+
+      - name: Compute checksums
+        id: sha
+        run: |
+          echo "darwin_arm64=$(shasum -a 256 artifacts/codesize-darwin-arm64.tar.gz | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "darwin_x64=$(shasum  -a 256 artifacts/codesize-darwin-x64.tar.gz    | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "linux_x64=$(shasum   -a 256 artifacts/codesize-linux-x64.tar.gz     | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+          echo "linux_arm64=$(shasum -a 256 artifacts/codesize-linux-arm64.tar.gz   | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+
+      - name: Dispatch to homebrew tap
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.TAP_DISPATCH_TOKEN }}
+          repository: ChrisGVE/homebrew-tap
+          event-type: codesize-release-published
+          client-payload: |
+            {
+              "formula": "codesize",
+              "version": "${{ github.ref_name }}",
+              "darwin_arm64_sha256": "${{ steps.sha.outputs.darwin_arm64 }}",
+              "darwin_x64_sha256": "${{ steps.sha.outputs.darwin_x64 }}",
+              "linux_x64_sha256": "${{ steps.sha.outputs.linux_x64 }}",
+              "linux_arm64_sha256": "${{ steps.sha.outputs.linux_arm64 }}"
+            }
