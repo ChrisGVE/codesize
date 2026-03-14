@@ -33,6 +33,10 @@ struct Args {
     /// Overrides the `respect_gitignore` setting in config.toml.
     #[arg(long, default_value_t = false)]
     gitignore: bool,
+
+    /// Exit with status 1 if any violations are found.  Useful for CI.
+    #[arg(long, default_value_t = false)]
+    fail: bool,
 }
 
 #[derive(Subcommand)]
@@ -81,6 +85,11 @@ fn main() -> anyhow::Result<()> {
         )
     };
 
+    let has_violations = !findings.is_empty();
     scanner::write_csv(&mut findings, output.as_deref())?;
+
+    if args.fail && has_violations {
+        process::exit(1);
+    }
     Ok(())
 }
