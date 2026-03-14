@@ -33,10 +33,18 @@ struct FileConfig {
     limits: HashMap<String, LangLimits>,
     #[serde(default)]
     scan: ScanOverrides,
+    /// Maps file extensions (with leading dot, e.g. `".rb"`) to language names.
+    /// Any language name is valid; if no tree-sitter grammar exists for it,
+    /// only the file-length limit is enforced (no function analysis).
+    #[serde(default)]
+    languages: HashMap<String, String>,
 }
 
 pub struct Config {
     pub limits: HashMap<String, LangLimits>,
+    /// User-defined extension → language name mappings (extension includes leading dot,
+    /// lowercased). Consulted after the built-in extension table.
+    pub extra_languages: HashMap<String, String>,
     pub skip_dirs: HashSet<String>,
     pub skip_suffixes: HashSet<String>,
     pub respect_gitignore: bool,
@@ -116,8 +124,24 @@ pub fn load_config() -> Config {
         .map(|v| v.into_iter().collect())
         .unwrap_or_else(default_skip_suffixes);
 
+    // Normalize user-supplied extension keys to lowercase with a leading dot.
+    let extra_languages = file_cfg
+        .languages
+        .into_iter()
+        .map(|(ext, lang)| {
+            let ext = ext.trim().to_lowercase();
+            let ext = if ext.starts_with('.') {
+                ext
+            } else {
+                format!(".{ext}")
+            };
+            (ext, lang)
+        })
+        .collect();
+
     Config {
         limits,
+        extra_languages,
         skip_dirs,
         skip_suffixes,
         respect_gitignore: file_cfg.scan.respect_gitignore.unwrap_or(false),

@@ -3,20 +3,20 @@ use tree_sitter::{Language, Node, Parser};
 
 pub type Functions = Vec<(String, usize, usize)>;
 
-fn language_for(key: &str) -> Language {
+fn language_for(key: &str) -> Option<Language> {
     match key {
-        "Python" => Language::new(tree_sitter_python::LANGUAGE),
-        "Rust" => Language::new(tree_sitter_rust::LANGUAGE),
-        "Go" => Language::new(tree_sitter_go::LANGUAGE),
-        "JavaScript" => Language::new(tree_sitter_javascript::LANGUAGE),
-        "TypeScript" => Language::new(tree_sitter_typescript::LANGUAGE_TYPESCRIPT),
-        "TSX" => Language::new(tree_sitter_typescript::LANGUAGE_TSX),
-        "Java" => Language::new(tree_sitter_java::LANGUAGE),
-        "C" => Language::new(tree_sitter_c::LANGUAGE),
-        "C++" => Language::new(tree_sitter_cpp::LANGUAGE),
-        "Swift" => Language::new(tree_sitter_swift::LANGUAGE),
-        "Lua" => Language::new(tree_sitter_lua::LANGUAGE),
-        _ => panic!("Unknown language key: {key}"),
+        "Python" => Some(Language::new(tree_sitter_python::LANGUAGE)),
+        "Rust" => Some(Language::new(tree_sitter_rust::LANGUAGE)),
+        "Go" => Some(Language::new(tree_sitter_go::LANGUAGE)),
+        "JavaScript" => Some(Language::new(tree_sitter_javascript::LANGUAGE)),
+        "TypeScript" => Some(Language::new(tree_sitter_typescript::LANGUAGE_TYPESCRIPT)),
+        "TSX" => Some(Language::new(tree_sitter_typescript::LANGUAGE_TSX)),
+        "Java" => Some(Language::new(tree_sitter_java::LANGUAGE)),
+        "C" => Some(Language::new(tree_sitter_c::LANGUAGE)),
+        "C++" => Some(Language::new(tree_sitter_cpp::LANGUAGE)),
+        "Swift" => Some(Language::new(tree_sitter_swift::LANGUAGE)),
+        "Lua" => Some(Language::new(tree_sitter_lua::LANGUAGE)),
+        _ => None,
     }
 }
 
@@ -102,12 +102,19 @@ fn count_lines(source: &[u8]) -> usize {
 /// `path` is used only to select the TSX grammar for `.tsx` files.
 pub fn analyze_source(source: &[u8], path: &str, lang: &str) -> (usize, Functions) {
     let lang_key = if path.ends_with(".tsx") { "TSX" } else { lang };
+    let total_lines = count_lines(source);
+
+    let Some(grammar) = language_for(lang_key) else {
+        // No tree-sitter grammar available; report file length only.
+        return (total_lines, Vec::new());
+    };
+
     let ftypes = func_types(lang_key);
     let arrows = has_arrow_funcs(lang_key);
 
     let mut parser = Parser::new();
     parser
-        .set_language(&language_for(lang_key))
+        .set_language(&grammar)
         .expect("Failed to set language");
 
     let tree = parser.parse(source, None).expect("Failed to parse");
@@ -120,7 +127,7 @@ pub fn analyze_source(source: &[u8], path: &str, lang: &str) -> (usize, Function
         arrows,
         &mut results,
     );
-    (count_lines(source), results)
+    (total_lines, results)
 }
 
 /// Reads `path` from disk and delegates to [`analyze_source`].

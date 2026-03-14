@@ -5,8 +5,11 @@ functions that exceed per-language size limits.  Results are written to a CSV
 file (or printed to stdout) so they can be fed directly into task-management
 workflows or CI checks.
 
-Supported languages: **Rust · TypeScript · JavaScript · Python · Go · Java ·
+Built-in grammars: **Rust · TypeScript · JavaScript · Python · Go · Java ·
 C · C++ · Swift · Lua**
+
+Any other language can be added via config.  If no tree-sitter grammar is
+available for it, the file-length limit is still enforced.
 
 ---
 
@@ -152,10 +155,35 @@ and with `respect_gitignore`.  All three can be active simultaneously.
 **Default `skip_suffixes`:** `.d.ts`, `.min.js`, `.min.ts`, `.min.mjs`,
 `_pb2.py`, `_pb.go`, `.pb.go`
 
+### `[languages]` — add or remap file extensions
+
+Map any file extension to a language name.  Built-in extensions are checked
+first; entries here serve as fallbacks.
+
+```toml
+[languages]
+".rb"  = "Ruby"
+".ex"  = "Elixir"
+".exs" = "Elixir"
+```
+
+The extension must include the leading dot.  Leading dots and casing are
+normalised automatically, so `rb`, `.rb`, and `.RB` all work.
+
+**Grammar availability** determines how much analysis is possible:
+
+| Situation | File limit | Function limit |
+|---|---|---|
+| Built-in grammar (Rust, Python, …) | yes | yes |
+| No grammar (Ruby, Elixir, …) | yes | — (skipped) |
+
+For languages without a grammar you still need a `[limits.<Name>]` entry, but
+only `file` is meaningful (the `function` key is accepted and ignored).
+
 ### `[limits.<Language>]` options
 
-Override the file or function limit for any supported language.  Only the
-entries you specify are changed; all others keep their built-in values.
+Override the file or function limit for any language — built-in or custom.
+Only the entries you specify are changed; all others keep their built-in values.
 
 ```toml
 [limits.Rust]
@@ -164,6 +192,11 @@ function = 100   # was 80
 
 [limits.Python]
 function = 50    # was 30; leave file limit at 300
+
+# Custom language added via [languages] above:
+[limits.Ruby]
+file = 300
+function = 30
 ```
 
 **Built-in limits**

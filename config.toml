@@ -50,6 +50,24 @@ skip_suffixes = [
 ]
 
 # ---------------------------------------------------------------------------
+# [languages] – add or remap file extensions
+# ---------------------------------------------------------------------------
+# Maps file extensions (with or without a leading dot) to language names.
+# Built-in extensions are checked first; entries here act as fallbacks.
+#
+# Any language name is valid.  If no tree-sitter grammar exists for it,
+# only the file-length limit is enforced (function analysis is skipped).
+# Grammar-backed languages (Rust, Python, Go, etc.) get full analysis.
+#
+# To enable a custom language you also need a matching [limits.<Name>] entry.
+#
+# Example: add Ruby and Elixir support
+# [languages]
+# ".rb"  = "Ruby"
+# ".ex"  = "Elixir"
+# ".exs" = "Elixir"
+
+# ---------------------------------------------------------------------------
 # [limits.<Language>] – per-language file and function size limits
 # ---------------------------------------------------------------------------
 # Each entry overrides just that language; others keep their built-in values.

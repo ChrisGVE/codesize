@@ -15,7 +15,7 @@ pub struct Finding {
     pub limit: usize,
 }
 
-fn ext_to_lang(ext: &str) -> Option<&'static str> {
+fn builtin_ext_to_lang(ext: &str) -> Option<&'static str> {
     match ext {
         ".rs" => Some("Rust"),
         ".ts" | ".tsx" => Some("TypeScript"),
@@ -41,7 +41,10 @@ fn in_allowed_dir(rel: &Path, config: &Config) -> bool {
 }
 
 /// Applies per-entry filename/extension filters, yielding `(path, lang)`.
-fn classify(path: PathBuf, config: &Config) -> Option<(PathBuf, &'static str)> {
+///
+/// Built-in extensions are checked first; user-configured mappings in
+/// `config.extra_languages` are consulted as a fallback for unknown extensions.
+fn classify(path: PathBuf, config: &Config) -> Option<(PathBuf, String)> {
     let filename = path.file_name()?.to_string_lossy().to_lowercase();
     if config
         .skip_suffixes
@@ -51,7 +54,10 @@ fn classify(path: PathBuf, config: &Config) -> Option<(PathBuf, &'static str)> {
         return None;
     }
     let ext = path.extension()?.to_string_lossy().to_lowercase();
-    let lang = ext_to_lang(&format!(".{ext}"))?;
+    let ext_key = format!(".{ext}");
+    let lang = builtin_ext_to_lang(&ext_key)
+        .map(|s| s.to_string())
+        .or_else(|| config.extra_languages.get(&ext_key).cloned())?;
     Some((path, lang))
 }
 
@@ -68,7 +74,7 @@ fn classify(path: PathBuf, config: &Config) -> Option<(PathBuf, &'static str)> {
 pub fn iter_code_files<'a>(
     root: &'a Path,
     config: &'a Config,
-) -> impl Iterator<Item = (PathBuf, &'static str)> + 'a {
+) -> impl Iterator<Item = (PathBuf, String)> + 'a {
     let mut builder = WalkBuilder::new(root);
     builder
         .hidden(true)
@@ -107,14 +113,14 @@ pub fn build_report(root: &Path, tolerance_pct: f64, config: &Config) -> Vec<Fin
             .to_string_lossy()
             .into_owned();
 
-        let Some(limits) = config.limits.get(lang) else {
+        let Some(limits) = config.limits.get(&lang) else {
             continue;
         };
         let factor = 1.0 + tolerance_pct / 100.0;
         let file_limit = (limits.file as f64 * factor) as usize;
         let func_limit = (limits.function as f64 * factor) as usize;
 
-        let (line_count, functions) = analyze_file(&path, lang);
+        let (line_count, functions) = analyze_file(&path, &lang);
 
         if line_count > file_limit {
             findings.push(Finding {
