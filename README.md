@@ -235,11 +235,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install codesize
-        run: cargo install codesize
-      - name: Check code size
-        run: codesize --root . --stdout --gitignore --fail
+      - uses: ChrisGVE/codesize-action@v1
 ```
+
+See [codesize-action](https://github.com/ChrisGVE/codesize-action) for the
+full list of inputs and outputs.
 
 ### pre-commit
 
