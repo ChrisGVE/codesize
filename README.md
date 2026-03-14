@@ -94,6 +94,7 @@ codesize --tolerance 10
 | `--stdout` | off | Write CSV to stdout; ignores `--output` |
 | `--tolerance <n>` | `0` | Percent tolerance added to every limit |
 | `--gitignore` | off | Honour `.gitignore` / `.ignore` files; overrides config |
+| `--fail` | off | Exit with status 1 if any violations are found (for CI) |
 
 \* The default output filename can be changed via `default_output_file` in
 `config.toml` (see below).
@@ -237,7 +238,7 @@ jobs:
       - name: Install codesize
         run: cargo install codesize
       - name: Check code size
-        run: codesize --root . --stdout --gitignore
+        run: codesize --root . --stdout --gitignore --fail
 ```
 
 ### pre-commit
