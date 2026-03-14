@@ -1,5 +1,10 @@
 # codesize
 
+[![CI](https://github.com/ChrisGVE/codesize/actions/workflows/ci.yml/badge.svg)](https://github.com/ChrisGVE/codesize/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ChrisGVE/codesize)](https://github.com/ChrisGVE/codesize/releases/latest)
+[![Crates.io](https://img.shields.io/crates/v/codesize)](https://crates.io/crates/codesize)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A fast, single-binary CLI tool that scans a source tree and reports files and
 functions that exceed per-language size limits.  Results are written to a CSV
 file (or printed to stdout) so they can be fed directly into task-management
@@ -213,6 +218,46 @@ function = 30
 | C++ | 400 | 60 |
 | Swift | 400 | 50 |
 | Lua | 400 | 50 |
+
+---
+
+## CI and pre-commit integration
+
+### GitHub Actions
+
+```yaml
+# .github/workflows/codesize.yml
+name: Code size check
+on: [push, pull_request]
+jobs:
+  codesize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install codesize
+        run: cargo install codesize
+      - name: Check code size
+        run: codesize --root . --stdout --gitignore
+```
+
+### pre-commit
+
+Add to `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: codesize
+        name: codesize
+        language: system
+        entry: codesize
+        args: [--stdout, --gitignore]
+        pass_filenames: false
+        always_run: true
+```
+
+Requires `codesize` to be installed and on `$PATH`.
 
 ---
 

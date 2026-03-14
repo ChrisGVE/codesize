@@ -4,6 +4,12 @@ version = "0.1.0"
 edition = "2021"
 description = "Report code size violations by file and function"
 license = "MIT"
+repository = "https://github.com/ChrisGVE/codesize"
+homepage = "https://github.com/ChrisGVE/codesize"
+documentation = "https://github.com/ChrisGVE/codesize#readme"
+keywords = ["code-quality", "static-analysis", "metrics", "tree-sitter", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+exclude = [".github", "config.toml"]
 
 [lib]
 name = "codesize"
