@@ -16,6 +16,8 @@ fn language_for(key: &str) -> Option<Language> {
         "C++" => Some(Language::new(tree_sitter_cpp::LANGUAGE)),
         "Swift" => Some(Language::new(tree_sitter_swift::LANGUAGE)),
         "Lua" => Some(Language::new(tree_sitter_lua::LANGUAGE)),
+        "ObjC" => Some(Language::new(tree_sitter_objc::LANGUAGE)),
+        "Zig" => Some(Language::new(tree_sitter_zig::LANGUAGE)),
         _ => None,
     }
 }
@@ -30,6 +32,8 @@ fn func_types(lang: &str) -> &'static [&'static str] {
         "C" | "C++" => &["function_definition"],
         "Swift" => &["function_declaration"],
         "Lua" => &["function_declaration"],
+        "ObjC" => &["function_definition", "method_definition"],
+        "Zig" => &["function_declaration"],
         _ => &[],
     }
 }
@@ -39,7 +43,7 @@ fn has_arrow_funcs(lang: &str) -> bool {
 }
 
 fn get_name<'a>(node: Node<'a>, source: &[u8], lang: &str) -> String {
-    if lang == "C" || lang == "C++" {
+    if lang == "C" || lang == "C++" || (lang == "ObjC" && node.kind() == "function_definition") {
         let mut decl = node.child_by_field_name("declarator");
         while let Some(d) = decl {
             if d.kind() == "identifier" || d.kind() == "field_identifier" {
@@ -49,10 +53,50 @@ fn get_name<'a>(node: Node<'a>, source: &[u8], lang: &str) -> String {
         }
         return "<anonymous>".to_string();
     }
+    if lang == "ObjC" && node.kind() == "method_definition" {
+        return get_objc_selector(node, source);
+    }
     node.child_by_field_name("name")
         .and_then(|n| n.utf8_text(source).ok())
         .map(|s| s.to_string())
         .unwrap_or_else(|| "<anonymous>".to_string())
+}
+
+/// Builds an ObjC selector string from a `method_definition` node.
+///
+/// The grammar represents selectors as alternating `identifier` and
+/// `method_parameter` children:
+///   `- (void)foo`                → identifier `foo`
+///   `- (void)setName:(id)x`      → identifier `setName` + method_parameter → `"setName:"`
+///   `- (void)foo:(id)x bar:(int)y` → `"foo:bar:"`
+fn get_objc_selector(node: Node, source: &[u8]) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for i in 0..node.child_count() {
+        let Some(child) = node.child(i as u32) else {
+            continue;
+        };
+        match child.kind() {
+            "identifier" => {
+                if let Ok(t) = child.utf8_text(source) {
+                    parts.push(t.to_string());
+                }
+            }
+            "method_parameter" => {
+                // Append colon to the preceding keyword identifier.
+                if let Some(last) = parts.last_mut() {
+                    if !last.ends_with(':') {
+                        last.push(':');
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    if parts.is_empty() {
+        "<anonymous>".to_string()
+    } else {
+        parts.join("")
+    }
 }
 
 fn is_arrow_declarator(node: Node) -> bool {
@@ -376,6 +420,54 @@ mod tests {
     fn lua_line_span() {
         let src = "function foo()\n  local x = 1\n  return x\nend\n";
         let fs = funcs(src, "Lua", "f.lua");
+        assert_eq!(fs[0].2 - fs[0].1 + 1, 4);
+    }
+
+    // --- Objective-C ---
+
+    #[test]
+    fn objc_c_function() {
+        let src = "void greet(const char *name) {\n    return;\n}\n";
+        assert_eq!(names(src, "ObjC", "f.m"), vec!["greet"]);
+    }
+
+    #[test]
+    fn objc_simple_method() {
+        let src = "@implementation Foo\n- (void)bar {\n    int x = 1;\n}\n@end\n";
+        assert!(names(src, "ObjC", "f.m").contains(&"bar".to_string()));
+    }
+
+    #[test]
+    fn objc_keyword_method() {
+        let src = "@implementation Foo\n- (void)setName:(NSString *)name {\n    self->name = name;\n}\n@end\n";
+        assert!(names(src, "ObjC", "f.m").contains(&"setName:".to_string()));
+    }
+
+    #[test]
+    fn objc_multi_keyword_method() {
+        let src =
+            "@implementation Foo\n- (void)doFoo:(int)a withBar:(int)b {\n    return;\n}\n@end\n";
+        assert!(names(src, "ObjC", "f.m").contains(&"doFoo:withBar:".to_string()));
+    }
+
+    // --- Zig ---
+
+    #[test]
+    fn zig_simple_fn() {
+        let src = "pub fn add(a: i32, b: i32) i32 {\n    return a + b;\n}\n";
+        assert_eq!(names(src, "Zig", "f.zig"), vec!["add"]);
+    }
+
+    #[test]
+    fn zig_private_fn() {
+        let src = "fn helper() void {\n}\n";
+        assert_eq!(names(src, "Zig", "f.zig"), vec!["helper"]);
+    }
+
+    #[test]
+    fn zig_line_span() {
+        let src = "pub fn foo() void {\n    const x = 1;\n    _ = x;\n}\n";
+        let fs = funcs(src, "Zig", "f.zig");
         assert_eq!(fs[0].2 - fs[0].1 + 1, 4);
     }
 

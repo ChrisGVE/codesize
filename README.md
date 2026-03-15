@@ -11,7 +11,7 @@ file (or printed to stdout) so they can be fed directly into task-management
 workflows or CI checks.
 
 Built-in grammars: **Rust · TypeScript · JavaScript · Python · Go · Java ·
-C · C++ · Swift · Lua**
+C · C++ · Swift · Lua · Objective-C · Zig**
 
 Any other language can be added via config.  If no tree-sitter grammar is
 available for it, the file-length limit is still enforced.
@@ -219,6 +219,8 @@ function = 30
 | C++ | 400 | 60 |
 | Swift | 400 | 50 |
 | Lua | 400 | 50 |
+| Objective-C | 400 | 50 |
+| Zig | 400 | 60 |
 
 ---
 

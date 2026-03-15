@@ -27,6 +27,8 @@ fn builtin_ext_to_lang(ext: &str) -> Option<&'static str> {
         ".cpp" | ".cc" | ".cxx" | ".hpp" | ".hh" | ".hxx" | ".ipp" => Some("C++"),
         ".swift" => Some("Swift"),
         ".lua" => Some("Lua"),
+        ".m" | ".mm" => Some("ObjC"),
+        ".zig" => Some("Zig"),
         _ => None,
     }
 }

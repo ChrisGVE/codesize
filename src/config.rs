@@ -65,6 +65,8 @@ fn default_limits() -> HashMap<String, LangLimits> {
         ("C++", 400, 60),
         ("Swift", 400, 50),
         ("Lua", 400, 50),
+        ("ObjC", 400, 50),
+        ("Zig", 400, 60),
     ]
     .into_iter()
     .map(|(lang, file, function)| (lang.to_string(), LangLimits { file, function }))
