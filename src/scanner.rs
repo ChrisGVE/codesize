@@ -118,34 +118,40 @@ pub fn build_report(root: &Path, tolerance_pct: f64, config: &Config) -> Vec<Fin
         let Some(limits) = config.limits.get(&lang) else {
             continue;
         };
-        let factor = 1.0 + tolerance_pct / 100.0;
-        let file_limit = (limits.file as f64 * factor) as usize;
-        let func_limit = (limits.function as f64 * factor) as usize;
+        let file_limit = limits.file;
+        let func_limit = limits.function;
 
         let (line_count, functions) = analyze_file(&path, &lang);
 
         if line_count > file_limit {
-            findings.push(Finding {
-                language: lang.to_string(),
-                exception: "file".to_string(),
-                function: String::new(),
-                codefile: rel.clone(),
-                lines: line_count,
-                limit: file_limit,
-            });
+            let excess_pct = (line_count as f64 - file_limit as f64) / file_limit as f64 * 100.0;
+            if excess_pct > tolerance_pct {
+                findings.push(Finding {
+                    language: lang.to_string(),
+                    exception: "file".to_string(),
+                    function: String::new(),
+                    codefile: rel.clone(),
+                    lines: line_count,
+                    limit: file_limit,
+                });
+            }
         }
 
         for (name, start, end) in functions {
             let func_lines = end - start + 1;
             if func_lines > func_limit {
-                findings.push(Finding {
-                    language: lang.to_string(),
-                    exception: "function".to_string(),
-                    function: name,
-                    codefile: rel.clone(),
-                    lines: func_lines,
-                    limit: func_limit,
-                });
+                let excess_pct =
+                    (func_lines as f64 - func_limit as f64) / func_limit as f64 * 100.0;
+                if excess_pct > tolerance_pct {
+                    findings.push(Finding {
+                        language: lang.to_string(),
+                        exception: "function".to_string(),
+                        function: name,
+                        codefile: rel.clone(),
+                        lines: func_lines,
+                        limit: func_limit,
+                    });
+                }
             }
         }
     }

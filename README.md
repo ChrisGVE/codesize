@@ -79,7 +79,7 @@ codesize --stdout
 # Respect .gitignore files in the scanned tree
 codesize --gitignore
 
-# Allow 10 % headroom above every language limit
+# Suppress findings within 10 % above the limit
 codesize --tolerance 10
 ```
 
@@ -92,7 +92,7 @@ codesize --tolerance 10
 | `--root <path>` | `.` (cwd) | Directory to scan |
 | `--output <path>` | `codesize.csv`* | CSV output file path |
 | `--stdout` | off | Write CSV to stdout; ignores `--output` |
-| `--tolerance <n>` | `0` | Percent tolerance added to every limit |
+| `--tolerance <n>` | `0` | Suppress findings within this % above the limit |
 | `--gitignore` | off | Honour `.gitignore` / `.ignore` files; overrides config |
 | `--fail` | off | Exit with status 1 if any violations are found (for CI) |
 
@@ -116,7 +116,7 @@ language,exception,function,codefile,lines,limit
 | `function` | Function name; empty for file-level violations |
 | `codefile` | Path relative to `--root` |
 | `lines` | Measured line count |
-| `limit` | Effective limit (after tolerance) |
+| `limit` | Language limit for this item |
 
 Rows are sorted by language, then by line count descending.
 

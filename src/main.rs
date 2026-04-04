@@ -25,7 +25,7 @@ struct Args {
     #[arg(long, default_value_t = false)]
     stdout: bool,
 
-    /// Percent tolerance added to limits (default 0).
+    /// Percent tolerance: findings within this % above the limit are excluded (default 0).
     #[arg(long, default_value_t = 0.0)]
     tolerance: f64,
 

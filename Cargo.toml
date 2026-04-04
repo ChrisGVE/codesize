@@ -1,6 +1,6 @@
 [package]
 name = "codesize"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Report code size violations by file and function"
 license = "MIT"
