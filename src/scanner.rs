@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use glob::glob;
 use ignore::WalkBuilder;
 
 use crate::config::Config;
@@ -105,10 +107,56 @@ pub fn iter_code_files<'a>(
         .filter_map(move |e| classify(e.path().to_path_buf(), config))
 }
 
-/// Scans `root` and returns all findings that exceed the configured limits.
-pub fn build_report(root: &Path, tolerance_pct: f64, config: &Config) -> Vec<Finding> {
+/// Resolves file/glob patterns relative to `root`.
+///
+/// When `recursive` is true each pattern is prefixed with `**/` so it
+/// matches in all subdirectories.  Patterns without glob metacharacters
+/// are treated as literal paths.  Results are deduplicated and filtered
+/// through `classify` to ensure only recognised source files are returned.
+pub fn resolve_patterns(
+    root: &Path,
+    patterns: &[String],
+    recursive: bool,
+    config: &Config,
+) -> Vec<(PathBuf, String)> {
+    let mut seen = HashSet::new();
+    let mut results = Vec::new();
+
+    for pattern in patterns {
+        let full = if recursive {
+            root.join("**").join(pattern)
+        } else {
+            root.join(pattern)
+        };
+        let glob_str = full.to_string_lossy().to_string();
+
+        let Ok(entries) = glob(&glob_str) else {
+            continue;
+        };
+        for entry in entries.filter_map(|e| e.ok()) {
+            if !entry.is_file() {
+                continue;
+            }
+            if !seen.insert(entry.clone()) {
+                continue;
+            }
+            if let Some(pair) = classify(entry, config) {
+                results.push(pair);
+            }
+        }
+    }
+    results
+}
+
+/// Collects findings from an iterator of classified source files.
+fn collect_findings(
+    files: impl Iterator<Item = (PathBuf, String)>,
+    root: &Path,
+    tolerance_pct: f64,
+    config: &Config,
+) -> Vec<Finding> {
     let mut findings = Vec::new();
-    for (path, lang) in iter_code_files(root, config) {
+    for (path, lang) in files {
         let rel = path
             .strip_prefix(root)
             .unwrap_or(&path)
@@ -156,6 +204,23 @@ pub fn build_report(root: &Path, tolerance_pct: f64, config: &Config) -> Vec<Fin
         }
     }
     findings
+}
+
+/// Scans `root` and returns all findings that exceed the configured limits.
+pub fn build_report(root: &Path, tolerance_pct: f64, config: &Config) -> Vec<Finding> {
+    collect_findings(iter_code_files(root, config), root, tolerance_pct, config)
+}
+
+/// Scans files matching `patterns` and returns all findings that exceed limits.
+pub fn build_report_from_patterns(
+    root: &Path,
+    patterns: &[String],
+    recursive: bool,
+    tolerance_pct: f64,
+    config: &Config,
+) -> Vec<Finding> {
+    let files = resolve_patterns(root, patterns, recursive, config);
+    collect_findings(files.into_iter(), root, tolerance_pct, config)
 }
 
 /// Writes `findings` as CSV sorted by (language, lines desc).
@@ -324,5 +389,80 @@ mod tests {
             .collect();
         assert!(names.contains(&"main.py".to_string()));
         assert!(!names.contains(&"generated.py".to_string()));
+    }
+
+    fn resolved_names(root: &Path, patterns: &[&str], recursive: bool) -> Vec<String> {
+        let cfg = load_config();
+        let pats: Vec<String> = patterns.iter().map(|s| s.to_string()).collect();
+        resolve_patterns(root, &pats, recursive, &cfg)
+            .into_iter()
+            .map(|(p, _)| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect()
+    }
+
+    #[test]
+    fn resolve_literal_file() {
+        let tmp = TempDir::new().unwrap();
+        make_tree(tmp.path(), &["src/main.py", "src/lib.py"]);
+        let names = resolved_names(tmp.path(), &["src/main.py"], false);
+        assert_eq!(names, vec!["main.py"]);
+    }
+
+    #[test]
+    fn resolve_glob_non_recursive() {
+        let tmp = TempDir::new().unwrap();
+        make_tree(tmp.path(), &["main.py", "lib.py", "sub/deep.py"]);
+        let names = resolved_names(tmp.path(), &["*.py"], false);
+        assert!(names.contains(&"main.py".to_string()));
+        assert!(names.contains(&"lib.py".to_string()));
+        assert!(!names.contains(&"deep.py".to_string()));
+    }
+
+    #[test]
+    fn resolve_glob_recursive() {
+        let tmp = TempDir::new().unwrap();
+        make_tree(tmp.path(), &["main.py", "sub/deep.py", "sub/inner/more.py"]);
+        let names = resolved_names(tmp.path(), &["*.py"], true);
+        assert!(names.contains(&"main.py".to_string()));
+        assert!(names.contains(&"deep.py".to_string()));
+        assert!(names.contains(&"more.py".to_string()));
+    }
+
+    #[test]
+    fn resolve_skips_unrecognised_extensions() {
+        let tmp = TempDir::new().unwrap();
+        make_tree(tmp.path(), &["main.py", "readme.txt"]);
+        let names = resolved_names(tmp.path(), &["*"], false);
+        assert!(names.contains(&"main.py".to_string()));
+        assert!(!names.contains(&"readme.txt".to_string()));
+    }
+
+    #[test]
+    fn resolve_deduplicates() {
+        let tmp = TempDir::new().unwrap();
+        make_tree(tmp.path(), &["src/main.py"]);
+        let cfg = load_config();
+        let pats = vec!["src/main.py".to_string(), "src/*.py".to_string()];
+        let results = resolve_patterns(tmp.path(), &pats, false, &cfg);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn resolve_multiple_patterns() {
+        let tmp = TempDir::new().unwrap();
+        make_tree(tmp.path(), &["main.py", "app.rs", "lib.go"]);
+        let names = resolved_names(tmp.path(), &["*.py", "*.rs"], false);
+        assert!(names.contains(&"main.py".to_string()));
+        assert!(names.contains(&"app.rs".to_string()));
+        assert!(!names.contains(&"lib.go".to_string()));
+    }
+
+    #[test]
+    fn resolve_skip_suffixes_applied() {
+        let tmp = TempDir::new().unwrap();
+        make_tree(tmp.path(), &["app.js", "app.min.js"]);
+        let names = resolved_names(tmp.path(), &["*.js"], false);
+        assert!(names.contains(&"app.js".to_string()));
+        assert!(!names.contains(&"app.min.js".to_string()));
     }
 }

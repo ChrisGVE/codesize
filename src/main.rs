@@ -7,7 +7,11 @@ use clap_complete::{generate, Shell};
 use codesize::{config, scanner};
 
 #[derive(Parser)]
-#[command(about = "Report code size violations by file and function.", version)]
+#[command(
+    about = "Report code size violations by file and function.",
+    version,
+    before_help = concat!("codesize ", env!("CARGO_PKG_VERSION")),
+)]
 struct Args {
     #[command(subcommand)]
     command: Option<Command>,
@@ -33,6 +37,17 @@ struct Args {
     /// Overrides the `respect_gitignore` setting in config.toml.
     #[arg(long, default_value_t = false)]
     gitignore: bool,
+
+    /// One or more files or glob patterns to check instead of scanning the
+    /// entire root tree.  When a pattern contains wildcards it is expanded
+    /// against the filesystem relative to --root.
+    #[arg(long, num_args = 1..)]
+    files: Option<Vec<String>>,
+
+    /// Recurse into subdirectories when expanding --files patterns.
+    /// Has no effect without --files.
+    #[arg(short = 'R', long, default_value_t = false)]
+    recursive: bool,
 
     /// Exit with status 1 if any violations are found.  Useful for CI.
     #[arg(long, default_value_t = false)]
@@ -68,13 +83,22 @@ fn main() -> anyhow::Result<()> {
         process::exit(2);
     }
 
+    if args.recursive && args.files.is_none() {
+        eprintln!("error: -R/--recursive requires --files");
+        process::exit(2);
+    }
+
     let root = args.root.canonicalize()?;
     let mut cfg = config::load_config();
 
     // CLI --gitignore overrides config; it can only enable, not disable.
     cfg.respect_gitignore |= args.gitignore;
 
-    let mut findings = scanner::build_report(&root, args.tolerance, &cfg);
+    let mut findings = if let Some(ref patterns) = args.files {
+        scanner::build_report_from_patterns(&root, patterns, args.recursive, args.tolerance, &cfg)
+    } else {
+        scanner::build_report(&root, args.tolerance, &cfg)
+    };
 
     let output: Option<PathBuf> = if args.stdout {
         None
