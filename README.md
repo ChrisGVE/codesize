@@ -3,7 +3,7 @@
 [![CI](https://github.com/ChrisGVE/codesize/actions/workflows/ci.yml/badge.svg)](https://github.com/ChrisGVE/codesize/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/ChrisGVE/codesize)](https://github.com/ChrisGVE/codesize/releases/latest)
 [![Crates.io](https://img.shields.io/crates/v/codesize)](https://crates.io/crates/codesize)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
 
 A fast, single-binary CLI tool that scans a source tree and reports files and
 functions that exceed per-language size limits.  Results are written to a CSV
@@ -278,4 +278,4 @@ as `ripgrep`) when gitignore support is enabled.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache License 2.0 — see [LICENSE](LICENSE).
